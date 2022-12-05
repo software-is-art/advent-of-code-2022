@@ -48,15 +48,8 @@ function solve(input::Vector{String})
     return count_fully_contained(ranges)
 end
 
-# Check if a path to the input file was provided as an argument
-if length(ARGS) < 1
-    println("Usage: julia script.jl /path/to/input.txt")
-    return
-  end
-  
-# Read the lines of the input file into an array of strings
-path = ARGS[1]
-lines = readlines(path)
+# Read the input
+lines = readlines("input.txt")
 
 # Pass the array of strings to the num_fully_contained_pairs function
 println(solve(lines))

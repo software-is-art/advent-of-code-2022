@@ -10,5 +10,4 @@ function findPacketStart(message::String, packetLength::Int)
     return length(message) 
 end
 
-
 println(findPacketStart(read("input.txt", String), 14))

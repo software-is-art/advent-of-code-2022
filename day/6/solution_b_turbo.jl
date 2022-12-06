@@ -20,5 +20,4 @@ end
 
 input = read("input.txt", String)
 @time resut = findPacketStart(input, 14)
-@time resut = findPacketStart(input, 14)
 println(resut)

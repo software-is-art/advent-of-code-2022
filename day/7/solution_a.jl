@@ -66,17 +66,7 @@ function parseLine(line::String, currentDir::Dir)
     return currentDir
 end
 
-function createDir(name::String, parent::Nothing)
-    return Dir(
-        name,
-        0,
-        Dict{String, Dir}(),
-        Dict{String, File}(),
-        parent
-    )
-end
-
-function createDir(name::String, parent::Dir)
+function createDir(name::String, parent::Union{Dir, Nothing})
     return Dir(
         name,
         0,

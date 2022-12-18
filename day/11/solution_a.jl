@@ -1,26 +1,8 @@
 using ParserCombinator
 
-struct Monkey{T}
-end
-
-function parseItems(items::String)
-    return [Int(a) for a in Meta.parse(items).args]
-end
-
-macro monkey(id::Int, startingItems)
-    @eval begin
-        function setItems(::Monkey{$id}, items::Vector{Vector{Int}})
-            insert!(items, $id, $startingItems)
-        end
-        function items(::Monkey{$id}, items::Vector{Vector{Int}})
-            return items[$id]
-        end
-    end
-end
-
 abstract type Node end
 struct Items <: Node val::Vector{Int} end
-struct Id <: Node val end
+struct Id <: Node val::Int end
 struct Op <: Node val end
 struct Condition <: Node val::Int end
 struct ThrowTo <: Node val::Int end
@@ -53,6 +35,97 @@ test = condition + branches > Test
 monkey.matcher = id + (startItems | op | test )[0:end] |> MonkeyNode
 monkeys = monkey[0:end]
 
-a = parse_one(read("day/11/input.txt", String), monkeys)
-println(a)
+abstract type AbstractMonkey end
+struct Monkey{T} <: AbstractMonkey end
+
+function parseItems(items::String)
+    return [Int(a) for a in Meta.parse(items).args]
+end
+
+function define(id::Id, test::Test)
+    index = id.val + 1
+    trueIndex = test.branchTrue.val.val + 1
+    falseIndex = test.branchFalse.val.val + 1
+    @eval begin
+        function testAndThrow(::Monkey{$id.val}, items::Vector{Vector{Int}})
+            item = items[$index][end]
+            if mod(item, $test.condition.val) == 0
+                push!(items[$trueIndex], item)
+            else
+                push!(items[$falseIndex], item)
+            end
+            pop!(items[$index])
+        end
+    end
+end
+
+function define(id::Id, op::Op)
+    index = id.val + 1
+    exp = Meta.parse(op.val)
+    @eval begin
+        function inspect(::Monkey{$id.val}, items::Vector{Vector{Int}}, inspects::Vector{Int})
+            old = items[$index][end]
+            items[$index][end] = div(($exp), 3)
+            inspects[$index] += 1
+        end
+    end
+end
+
+function define(id::Id, starting::Items)
+    index = id.val + 1
+    @eval begin
+        function setup(::Monkey{$id.val}, items::Vector{Vector{Int}})
+            items[$index] = $starting.val
+        end
+
+        function finished(::Monkey{$id.val}, items::Vector{Vector{Int}})
+            return length(items[$index]) == 0
+        end
+    end
+end
+
+function define(id::Id, ::Id) end
+
+function parseMonkeyAst(fileName::String)
+    return parse_one(read(fileName, String), monkeys)
+end
+
+function transformAst(monkeyNodes)
+    monkeys = Vector{AbstractMonkey}()
+    for monkeyNode in monkeyNodes
+        id = filter(x -> typeof(x) == Id, monkeyNode.val)[1]
+        [define(id, x) for x in monkeyNode.val]
+        insert!(monkeys, id.val + 1, @eval Monkey{$id.val}())
+    end
+    return monkeys
+end
+
+function playRound(monkeys::Vector{AbstractMonkey}, items::Vector{Vector{Int}}, inspects::Vector{Int})
+    for monkey in monkeys
+        while !finished(monkey, items)
+            inspect(monkey, items, inspects)
+            testAndThrow(monkey, items)
+        end
+    end
+end
+
+function run(monkeys::Vector{AbstractMonkey}, rounds::Int)
+    items = collect([[0] for x in monkeys])
+    inspects = collect([0 for x in monkeys])
+    [setup(x, items) for x in monkeys]
+
+    [playRound(monkeys, items, inspects) for x in 1:rounds]
+    return inspects
+end
+
+function monkeyBusiness(inspects::Vector{Int})
+    sorted = sort(inspects, rev=true)
+    return sorted[1] * sorted[2]
+end
+
+monkeyNodes = parseMonkeyAst("day/11/input.txt")
+monkeys = transformAst(monkeyNodes)
+inspects = run(monkeys, 20)
+println(monkeyBusiness(inspects))
+
 

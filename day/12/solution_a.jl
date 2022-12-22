@@ -1,3 +1,5 @@
+using Test
+
 function readMap(filename)
     map = Vector{Int}()
     start = 0
@@ -49,15 +51,25 @@ function shift(input::AbstractMatrix, left::Right)
 end
 
 function shift(input::AbstractMatrix, left::Up)
-    return shift(input, 100, 0, abs(left.val) * -1)
-end
-
-function shift(input::AbstractMatrix, left::Down)
     return shift(input, 100, 0, abs(left.val))
 end
 
+function shift(input::AbstractMatrix, left::Down)
+    return shift(input, 100, 0, abs(left.val) * -1)
+end
+
+testMat = Matrix([1 2 ; 3 4])
+@test shift(testMat, Right(1)) == Matrix([100 1; 100 3])
+@test shift(testMat, Left(1)) == Matrix([2 100; 4 100])
+@test shift(testMat, Up(1)) == Matrix([3 4; 100 100])
+@test shift(testMat, Down(1)) == Matrix([100 100; 1 2])
+
 (map, start, dest, dimensions) = readMap("day/12/input.txt")
-matrix = reshape(map, dimensions)
-right = shift(matrix, Right(1))
-grad = right - matrix
-println(grad)
+matrix = permutedims(reshape(map, dimensions))
+leftGrad = shift(matrix, Right(1)) - matrix
+rightGrad = shift(matrix, Left(1)) - matrix
+downGrad = shift(matrix, Up(1)) - matrix
+upGrad = shift(matrix, Down(1)) - matrix
+
+println(start)
+println(matrix[21, 1])

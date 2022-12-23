@@ -1,9 +1,49 @@
 using Test
 
+abstract type Direction end
+struct Left <: Direction end
+struct Right <: Direction end
+struct Up <: Direction end
+struct Down <: Direction end
+struct Point
+    x::Int
+    y::Int
+    index::Int
+end
+function Point(x::Int, y::Int, bounds::Matrix{Int})
+    return Point(x, y, bitIndex(x, y, bounds))
+end
+function Point(point::Tuple{Int, Int}, bounds::Matrix{Int})
+    (x, y) = point
+    return Point(x, y, bounds)
+end
+
+struct Path
+    head::Point
+    inclusion::BitSet
+    steps::Int
+end
+
+struct Paths
+    map::Matrix{Int}
+    start::Point
+    dest::Point
+    forwards::Set{Path}
+    backwards::Set{Path}
+end
+
+function Paths(map::Matrix{Int}, start::Point, dest::Point)
+    forwards = Set{Path}()
+    backwards = Set{Path}()
+    push!(forwards, Path(start, BitSet(start.index), 0))
+    push!(backwards, Path(dest, BitSet(dest.index), 0))
+    return Paths(map, start, dest, forwards, backwards)
+end
+
 function readMap(filename)
     map = Vector{Int}()
-    start = 0
-    dest  = 0
+    start = (0, 0)
+    dest  = (0, 0)
     dimensions = (0, 0)
     for (x, line) in enumerate(readlines(filename))
         for (y, c) in enumerate(line)
@@ -19,57 +59,47 @@ function readMap(filename)
             dimensions = (x, y)
         end
     end
-    return (map, start, dest, dimensions)
+    matrix = permutedims(reshape(map, dimensions))
+    return (matrix, Point(start, matrix), Point(dest, matrix), dimensions)
 end
 
-abstract type Direction end
-struct Left <: Direction val::Int end
-struct Right <: Direction val::Int end
-struct Up <: Direction val::Int end
-struct Down <: Direction val::Int end
+function bitIndex(x::Int, y::Int, matrix::Matrix{Int})
+    (stride, _) = size(matrix)
+    return x + (y * stride)
+end
 
-function shift(input::AbstractMatrix, fillVal::Int, x::Int, y::Int)
-    m, n = size(input)
-    result = input
-    if x != 0
-        column = fill(fillVal, m, abs(x))
-        result = (x > 0 ? [column result[:, 1:(n - x)]] : [result[:, (abs(x) + 1):n] column])
+function move(direction::Up, point::Point, bounds::Matrix{Int})
+    return Point(point.x, point.y - 1, bounds)
+end
+
+function move(direction::Down, point::Point, bounds::Matrix{Int})
+    return Point(point.x, point.y + 1, bounds)
+end
+
+function move(direction::Left, point::Point, bounds::Matrix{Int})
+    return Point(point.x - 1, point.y, bounds)
+end
+
+function move(direction::Right, point::Point, bounds::Matrix{Int})
+    return Point(point.x + 1, point.y)
+end
+
+function fork(path::Path, paths::Paths, next::Set{Path})
+    directions = [Left(), Right(), Up(), Down()]
+    for dir in directions
+        target = move(dir, path.head, paths.map)
+        gradient = abs(paths.map[target.x, target.y]- paths.map[path.head.x, path.head.y])
+        if 0 <= gradient <= 1 && !in(target.index, path.inclusion)
+            push!(next, Path(target, union(path.inclusion, BitSet(target.index)), path.steps + 1))
+        end
     end
-    if y != 0
-        column = fill(fillVal, abs(y), n)
-        result = (y > 0 ? [result[(y + 1):m, :]; column] : [column; result[1:(m - abs(y)), :]])
+end
+function traverse(paths::Paths)
+    nextForwards = Set{Path}()
+    for path in paths.forwards
+        fork(path, paths, nextForwards)
     end
-    return result
+    return nextForwards
 end
 
-function shift(input::AbstractMatrix, left::Left)
-    return shift(input, 100, abs(left.val) * -1, 0)
-end
-
-function shift(input::AbstractMatrix, left::Right)
-    return shift(input, 100, abs(left.val), 0)
-end
-
-function shift(input::AbstractMatrix, left::Up)
-    return shift(input, 100, 0, abs(left.val))
-end
-
-function shift(input::AbstractMatrix, left::Down)
-    return shift(input, 100, 0, abs(left.val) * -1)
-end
-
-testMat = Matrix([1 2 ; 3 4])
-@test shift(testMat, Right(1)) == Matrix([100 1; 100 3])
-@test shift(testMat, Left(1)) == Matrix([2 100; 4 100])
-@test shift(testMat, Up(1)) == Matrix([3 4; 100 100])
-@test shift(testMat, Down(1)) == Matrix([100 100; 1 2])
-
-(map, start, dest, dimensions) = readMap("day/12/input.txt")
-matrix = permutedims(reshape(map, dimensions))
-leftGrad = shift(matrix, Right(1)) - matrix
-rightGrad = shift(matrix, Left(1)) - matrix
-downGrad = shift(matrix, Up(1)) - matrix
-upGrad = shift(matrix, Down(1)) - matrix
-
-println(start)
-println(matrix[21, 1])
+(map, start, dest, dimensions) = readMap("day/12/small.txt")
